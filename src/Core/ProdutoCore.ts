@@ -1,6 +1,5 @@
 
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { validate } from "class-validator";
 import { ProdutoDto } from "src/Models/Dtos/ProdutoDto";
 import { IProdutoCore } from "src/Ports/In/IProdutoCore";
 

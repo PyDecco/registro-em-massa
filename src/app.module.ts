@@ -7,6 +7,7 @@ import { SequelizeModule } from '@nestjs/sequelize';
 import { ProdutoRepository } from './Adapters/PostgresSQLAdapter/ProdutoRepository';
 import { ProdutoCore } from './Core/ProdutoCore';
 import { TransformadorTipagemDeDado } from './Core/TransformadorTipagemDeDado';
+import { LogCore } from './Core/LogCore';
 
 @Module({
   imports: [DatabaseModule,
@@ -40,6 +41,7 @@ import { TransformadorTipagemDeDado } from './Core/TransformadorTipagemDeDado';
       provide: 'ITransformadorTipagemDeDado',
       useClass: TransformadorTipagemDeDado,
     },
+    LogCore,
     ...produtosProviders,
   ],
 })
