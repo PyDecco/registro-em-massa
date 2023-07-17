@@ -2,6 +2,8 @@ import { Controller, ForbiddenException, Get, Inject, InternalServerErrorExcepti
 import { FileInterceptor } from '@nestjs/platform-express';
 import { IProdutoUseCase } from 'src/Ports/In/IProdutoUseCase';
 import { LogCore } from 'src/Core/LogCore';
+import { ProdutoDto } from 'src/Models/Dtos/ProdutoDto';
+import { PageDto } from 'src/Models/Dtos/PageDto';
 
 @Controller()
 export class ProdutoController {
@@ -19,7 +21,7 @@ export class ProdutoController {
   @Get("/produtos")
   async getProduto(
   @Query('row_count') row_count: number,
-  @Query('row_skip') row_skip: number): Promise<any> {
+  @Query('row_skip') row_skip: number): Promise<PageDto<ProdutoDto>> {
     try {
         this.logger.logInfo(`GET /produtos - Requisição realizada as: ${new Date().toString()}`);
         var result =  this.produtoUseCase.BuscaDeProdutoPorPaginacao(row_count, row_skip);
@@ -39,7 +41,7 @@ export class ProdutoController {
   @UseInterceptors(FileInterceptor('file'))
   async upload(@UploadedFile() file): Promise<string> {
     try {
-        this.logger.logInfo(`POST /produtos - Requisição realizada as: ${new Date().toString()}`);
+        this.logger.logInfo(`POST /produtos - Requisição realizada as: ${Date.now()}`);
         await this.produtoUseCase.RegitroEmMassa(file.buffer);
         return 'Data uploaded successfully!';
     } catch (error) {

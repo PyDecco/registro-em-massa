@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Transaction } from 'sequelize';
 import { LogCore } from 'src/Core/LogCore';
+import { PageDto } from 'src/Models/Dtos/PageDto';
+import { PageMetaDto } from 'src/Models/Dtos/PageMetaDto';
 import { ProdutoDto } from 'src/Models/Dtos/ProdutoDto';
 import { IProdutoCore } from 'src/Ports/In/IProdutoCore';
 import { IProdutoUseCase } from 'src/Ports/In/IProdutoUseCase';
@@ -19,17 +21,13 @@ export class ProdutoUseCase implements IProdutoUseCase {
     return 'Hello World!';
   }
 
-  public async BuscaDeProdutoPorPaginacao(row_count: number ,row_skip: number): Promise<any> { 
-    const offset = (row_count - 1) * row_skip;
+  public async BuscaDeProdutoPorPaginacao(row_count: number ,row_skip: number): Promise<PageDto<ProdutoDto>> { 
+    const posicaoInicialDosRegistros = (row_count - 1) * row_skip;
     this.logger.logInfo(`GET /produtos - parametros row_count:${row_count} & row_skip:${row_skip}`);
-    var {count, rows} = await this.produtoRepository.BusqueProdutosPorPaginacao(offset);
+    var {count, rows} = await this.produtoRepository.BusqueProdutosPorPaginacao(posicaoInicialDosRegistros);
     this.produtoCore.LanceUmErroParaNenhumProdutoEncontrado(rows);
-    return {
-      totalItems: count,
-      currentPage: row_count,
-      totalPages: Math.ceil(count / row_skip),
-      data: rows,
-    };   
+    const pageMetaDto = new PageMetaDto(count, row_count, Math.ceil(count / row_skip));
+    return new PageDto(rows, pageMetaDto);
   }
   
   public async RegitroEmMassa(buffer: Buffer): Promise<void> {
