@@ -4,6 +4,7 @@ import { LogCore } from 'src/Core/LogCore';
 import { PageDto } from 'src/Models/Dtos/PageDto';
 import { PageMetaDto } from 'src/Models/Dtos/PageMetaDto';
 import { ProdutoDto } from 'src/Models/Dtos/ProdutoDto';
+import { ICalculoCore } from 'src/Ports/In/ICalculoCore';
 import { IProdutoCore } from 'src/Ports/In/IProdutoCore';
 import { IProdutoUseCase } from 'src/Ports/In/IProdutoUseCase';
 import { ITransformadorTipagemDeDado } from 'src/Ports/In/ITransformadorTipagemDeDado';
@@ -15,23 +16,25 @@ export class ProdutoUseCase implements IProdutoUseCase {
     @Inject('IProdutoRepository') private produtoRepository: IProdutoRepository,
     @Inject('IProdutoCore')private produtoCore: IProdutoCore,
     @Inject('ITransformadorTipagemDeDado')private transformadorTipagemDeDados: ITransformadorTipagemDeDado,
+    @Inject('ICalculoCore') private calculoCore: ICalculoCore,
     private logger: LogCore) {}
     
   getHello(): string {
     return 'Hello World!';
   }
 
-  public async BuscaDeProdutoPorPaginacao(row_count: number ,row_skip: number): Promise<PageDto<ProdutoDto>> { 
-    const posicaoInicialDosRegistros = (row_count - 1) * row_skip;
+  public async BuscaDeProdutoPorPaginacao(row_count: number ,row_skip: number): Promise<PageDto<ProdutoDto>> {  
+    const posicaoInicialDosRegistros = this.calculoCore.CalculeAPosicaoInicialDeRegistro(row_count,row_skip);
     this.logger.logInfo(`GET /produtos - parametros row_count:${row_count} & row_skip:${row_skip}`);
+    
     var {count, rows} = await this.produtoRepository.BusqueProdutosPorPaginacao(posicaoInicialDosRegistros);
     this.produtoCore.LanceUmErroParaNenhumProdutoEncontrado(rows);
-    const pageMetaDto = new PageMetaDto(count, row_count, Math.ceil(count / row_skip));
+    const pageMetaDto = new PageMetaDto(count, row_count, this.calculoCore.CalculeOTotalDePaginas(count,row_skip));
     return new PageDto(rows, pageMetaDto);
   }
   
   public async RegitroEmMassa(buffer: Buffer): Promise<void> {
-    const massaDeProdutos = this.transformadorTipagemDeDados.BuffParaJson(buffer);
+    const massaDeProdutos: ProdutoDto[] = this.transformadorTipagemDeDados.BuffParaJson<ProdutoDto>(buffer);
     this.logger.logInfo(`POST /produtos - Quantidade de itens inseridas são de: ${massaDeProdutos.length}`);
     
     const transaction = await this.produtoRepository.CrieUmaTransaction();

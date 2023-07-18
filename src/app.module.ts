@@ -8,6 +8,7 @@ import { ProdutoRepository } from './Adapters/PostgresSQLAdapter/ProdutoReposito
 import { ProdutoCore } from './Core/ProdutoCore';
 import { TransformadorTipagemDeDado } from './Core/TransformadorTipagemDeDado';
 import { LogCore } from './Core/LogCore';
+import { CalculoCore } from './Core/CalculoCore';
 
 @Module({
   imports: [DatabaseModule,
@@ -40,6 +41,10 @@ import { LogCore } from './Core/LogCore';
     {
       provide: 'ITransformadorTipagemDeDado',
       useClass: TransformadorTipagemDeDado,
+    },
+    {
+      provide: 'ICalculoCore',
+      useClass: CalculoCore,
     },
     LogCore,
     ...produtosProviders,

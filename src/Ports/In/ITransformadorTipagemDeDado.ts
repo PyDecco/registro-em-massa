@@ -1,5 +1,6 @@
 import { ProdutoDto } from "src/Models/Dtos/ProdutoDto";
+import { Type } from 'class-transformer';
 
 export interface ITransformadorTipagemDeDado{
-    BuffParaJson(buffer: Buffer): ProdutoDto[]
+    BuffParaJson<T>(buffer: Buffer): T[]
 }
