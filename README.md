@@ -54,6 +54,8 @@ La validación de dominio responde **422** con el índice del ítem. Un JSON mal
 
 ## Arquitectura
 
+![Arquitetura Hexagonal](image.png)
+
 Capas del **Catálogo**, de adentro hacia afuera:
 
 ```
@@ -61,6 +63,10 @@ domínio  →  aplicação (ports + use cases)  →  infraestrutura (adapters)
 ```
 
 La infraestructura depende del dominio. El dominio no conoce NestJS, Sequelize ni HTTP.
+
+![Arquitectura hexagonal del Catálogo](docs/arquitectura-hexagonal.svg)
+
+*Diagrama del diseño actual: el dominio queda en el centro y las dependencias apuntan hacia adentro. La infraestructura implementa los puertos; el dominio no conoce NestJS ni Sequelize.*
 
 | Capa | Qué entra | Qué no entra |
 | --- | --- | --- |
