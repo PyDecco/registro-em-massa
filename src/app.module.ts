@@ -1,53 +1,52 @@
 import { Module } from '@nestjs/common';
-import { ProdutoController } from './Adapters/HttpControllerAdapter/ProdutoController';
-import { ProdutoUseCase } from './UseCases/ProdutoUseCase';
-import { produtosProviders } from './Adapters/PostgresSQLAdapter/Infrastructure/produtos.provider';
-import { DatabaseModule } from './Adapters/PostgresSQLAdapter/Infrastructure/database.module';
-import { SequelizeModule } from '@nestjs/sequelize';
-import { ProdutoRepository } from './Adapters/PostgresSQLAdapter/ProdutoRepository';
-import { ProdutoCore } from './Core/ProdutoCore';
-import { TransformadorTipagemDeDado } from './Core/TransformadorTipagemDeDado';
-import { LogCore } from './Core/LogCore';
-import { CalculoCore } from './Core/CalculoCore';
+import { ConfigModule } from '@nestjs/config';
+import { BuscarProdutosPaginados } from './catalogo/application/buscar-produtos-paginados';
+import { CadastrarProdutosEmMassa } from './catalogo/application/cadastrar-produtos-em-massa';
+import {
+  PRODUTO_REPOSITORY,
+  ProdutoRepository,
+  UNIT_OF_WORK,
+  UnitOfWork,
+} from './catalogo/application/ports';
+import { ProdutoController } from './catalogo/infrastructure/http/produto.controller';
+import { AppLogger } from './catalogo/infrastructure/logging/app-logger';
+import { DatabaseModule } from './catalogo/infrastructure/persistence/database.module';
+import { SequelizeProdutoRepository } from './catalogo/infrastructure/persistence/sequelize-produto.repository';
+import { SequelizeUnitOfWork } from './catalogo/infrastructure/persistence/sequelize-unit-of-work';
 
 @Module({
-  imports: [DatabaseModule,
-    SequelizeModule.forRoot({
-      dialect: 'postgres',
-        host: 'localhost',
-        port: 5432,
-        username: 'postgres',
-        password: 'example',
-        database: 'nestdb',
-    }),],
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      envFilePath: ['.env'],
+    }),
+    DatabaseModule,
+  ],
   controllers: [ProdutoController],
   providers: [
-    ProdutoUseCase,
+    AppLogger,
+    SequelizeUnitOfWork,
+    SequelizeProdutoRepository,
     {
-      provide: 'IProdutoUseCase',
-      useClass: ProdutoUseCase,
-    },
-    ProdutoRepository,
-    {
-      provide: 'IProdutoRepository',
-      useClass: ProdutoRepository,
-    },
-    ProdutoRepository,
-    {
-      provide: 'IProdutoCore',
-      useClass: ProdutoCore,
-    },
-    ProdutoRepository,
-    {
-      provide: 'ITransformadorTipagemDeDado',
-      useClass: TransformadorTipagemDeDado,
+      provide: UNIT_OF_WORK,
+      useExisting: SequelizeUnitOfWork,
     },
     {
-      provide: 'ICalculoCore',
-      useClass: CalculoCore,
+      provide: PRODUTO_REPOSITORY,
+      useExisting: SequelizeProdutoRepository,
     },
-    LogCore,
-    ...produtosProviders,
+    {
+      provide: CadastrarProdutosEmMassa,
+      useFactory: (repositorio: ProdutoRepository, unitOfWork: UnitOfWork) =>
+        new CadastrarProdutosEmMassa(repositorio, unitOfWork),
+      inject: [PRODUTO_REPOSITORY, UNIT_OF_WORK],
+    },
+    {
+      provide: BuscarProdutosPaginados,
+      useFactory: (repositorio: ProdutoRepository) =>
+        new BuscarProdutosPaginados(repositorio),
+      inject: [PRODUTO_REPOSITORY],
+    },
   ],
 })
 export class AppModule {}

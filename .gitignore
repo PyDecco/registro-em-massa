@@ -2,6 +2,10 @@
 /dist
 /node_modules
 /registro-em-massa/data
+/data
+
+# env
+.env
 
 # Logs
 logs

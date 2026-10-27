@@ -1,44 +1,79 @@
-# REGISTRO DE PRODUTO EM MASSA.
-- Fazer um cadastro em massa de produtos. 
-- Onde o em um erro de validação, não deve cadastrar nehum produto na base de dados.
-- Indicar o erro de validação em algum item da massa quando não validado corretamente.
-- Buscar a massa de produtos por paginação
-- Registra logs do fluxo, do momento da requisição, logs de erro. 
+# Registro de produto em massa
 
-### Tecnologias utilizada.
- - Nestjs: Framework para nodeJS.
- - Sequelize: Para ORM de comunicação com banco.
- - PostgreSQL: como database. 
+API NestJS para cadastrar e consultar produtos em massa. O contexto delimitado é o **Catálogo**: cadastro e consulta paginada de produtos.
 
-## Logica
- - Para rollback do banco, foi preciso acoplar 3 eventos que utiliza transaction na service:
-    - `CREATE`: Criação da transaction que ira cuidar de toda massa;
-    - `ROLBACK`: Para que durante o processo de validação elimine todas os dados do banco para caso um dado no meio do fluxo.
-    - `COMMIT`: Após toda a massa ser validada. é feito um commit no final do processo para concretizar o registro no banco.  
- - Para lidar com a carga em massa, foi definido o registro no banco de 10.000 itens por lote. O que facilitou o processo de validação unitaria de cada item, e registro em massa utilizando bulktCrea(função do sequelize para multiplos registros );
- - Foi possivel realizar o registro em massa, apesar do retorno de timeout, toda massa foi agregada ao banco.
+Regra principal: **se qualquer item da massa falhar na validação ou na persistência, nenhum produto é salvo** (tudo ou nada). O item inválido é apontado na resposta.
 
-## Arquitetura 
+## Tecnologias
 
-![Arquitetura Hexagonal](image.png)
- - Conceitos utilizados para cada camada:
-    - `Adapter:` Toda comunicação de saida para o banco, de saida por fila, para uma outra api, entradas da controller http ou amqp.
-    - `Core:` Toda necessidade de validação, ajudadores que podem ser compartilhados em outras entidades, e calculos feitos para contemplar um fluxo deve ser posto aqui.
-    - `Models:`Todos os Dto's e entidades que definem como deve ser os formatos de valores, devem ser registrados aqui
-    - `Ports:` Todas as interfaces, onde utilizamos para acoplarmos os itens são registrados aqui, essas ports são importantes para facilitar testes unitarios e de integração para que evitemos de mockarmos são essenciais para arquitetura
-    - `UseCases`: Toda regra de negocio, e puramente sua regra sem conexão com o banco deve é registrada nessa camada, definindo um metodo publico para apresentar o cliente final como uma "receita de bolo", os metodos privados para consolidar conceitos S do SOLID deixando cada metodo com apenas uma ação.
-    
-- Vatangens: 
-    - `Code review`: Insumos onde podemos compartilhar com o time, conceitos para padronizar o codigo em Code Review onde direcionamos o time a pensar na mesma pagina
-    - `Facilidade com os testes`: os multiplos acomplamentos com validações, calculos e ajudadores, facilitam os testes unitarios serem feitos de forma correta, onde testamos nada mais que a unidade do sistema.
-    - `Nortear Dev's que trabalham em outras stacks`: A arquitetura tras facilidade de leitura onde quem tem o conhecimento consolidado sobre a arquitura teria mais facilidade de migrar do front para o back, ou do Python para node, por exemplo.
-    - `Facilidade para lidar com o ChatGPT`: Podemos usar o chatGPT para lidar com mini funções, que podem parece a parte mais complexa de alterar a linguagem,facilitando a comunicação com o chatGPT para adaptar a sintaxe que o dev não tem conhecimento.
-- Desvantagem
-    - `Curva de aprendizado do equipe`: inicialmente deve existir uma curva de aprendizado do time para entender o processo.
-    - `Adaptação para lidar com monolitos`: deve existir dentro do mesmo projeto esses mesmos arquivos para cada entidade. ex: Produto, Pedidos, Usuarios. Cada um carregando esses arquivos.
-     
-## Teste
-- Pendentes finalizar os testes
-- Facilidade que a arquitetura tras para o teste
-- Boa praticas de teste
-- Citar cada teste e o que trouxeue entra e sai da api deve ser agregada aqui, seja com
+- NestJS
+- Sequelize
+- PostgreSQL
+
+## Como rodar
+
+```bash
+cp .env.example .env
+docker compose up -d
+npm install
+npm run start:dev
+```
+
+Variáveis de ambiente (sem credenciais no código): `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`.
+
+```bash
+npm test    # unitários de domínio e casos de uso (sem banco)
+npm run build
+```
+
+## API
+
+`POST /produtos` — multipart, campo `file` com um JSON array:
+
+```json
+[
+  {
+    "key": "p-1",
+    "data_preco": "2026-01-10",
+    "cod_produto": 100,
+    "sku": "SKU-01",
+    "qtd_estoque": 5,
+    "desconto": 10,
+    "data_hora_insercao": "2026-01-10T10:00:00.000Z",
+    "data_inicio": "2026-01-01",
+    "data_fim": "2026-12-31"
+  }
+]
+```
+
+Validação de domínio responde **422** com o índice do item. JSON malformado ou arquivo ausente responde **400**. Sucesso: `{ "message": "Produtos cadastrados com sucesso" }`.
+
+`GET /produtos?page=1&limit=10` — paginação 1-based. `offset = (page - 1) * limit`. `limit` entre 1 e 100.
+
+`GET /` — healthcheck.
+
+## Arquitetura
+
+Camadas do **Catálogo**, de dentro para fora:
+
+```
+domínio  →  aplicação (ports + use cases)  →  infraestrutura (adapters)
+```
+
+A infraestrutura depende do domínio. O domínio não conhece NestJS, Sequelize nem HTTP.
+
+| Camada | O que entra | O que não entra |
+| --- | --- | --- |
+| **Domínio** | Agregado `Produto`, VOs, invariantes, `ErroDeValidacao` | NestJS, Sequelize, status HTTP |
+| **Aplicação** | Casos de uso e ports (`ProdutoRepository`, `UnitOfWork`) | Tipo `Transaction` do Sequelize, `HttpException` |
+| **Infraestrutura** | Controller HTTP, filter, repositório Sequelize, UoW, logger | Regra de negócio |
+
+**Ports e adapters:** os casos de uso recebem interfaces. O `AppModule` injeta as implementações Sequelize. Os testes unitários usam fakes em memória no lugar desses adapters.
+
+**Agregado `Produto`:** cria-se só se as invariantes passarem (código positivo, estoque ≥ 0, SKU, desconto 0–100, período válido). Comportamento: `estaVigente()`, `temEstoque()`.
+
+**Value objects:** `Sku` (normaliza e valida formato), `Desconto` (0–100) e `PeriodoVigencia` (`data_inicio`/`data_fim`, fim ≥ início).
+
+**Tudo ou nada:** o caso de uso valida a massa inteira *antes* de tocar no banco (e rejeita SKU duplicado). Só então `UnitOfWork.execute` abre uma transação, persiste os lotes (10.000 itens) e o Sequelize faz commit. Qualquer exceção dispara rollback — o repositório **não** engole erro de `bulkCreate`.
+
+Logs de requisição e de erro ficam no adapter HTTP (`logs/`).
