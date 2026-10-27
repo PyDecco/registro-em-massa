@@ -52,8 +52,6 @@ La validación de dominio responde **422** con el índice del ítem. Un JSON mal
 
 `GET /` — healthcheck.
 
-![Arquitetura Hexagonal](image.png)
-
 ## Arquitectura
 
 Capas del **Catálogo**, de adentro hacia afuera:
