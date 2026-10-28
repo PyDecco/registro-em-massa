@@ -1,16 +1,16 @@
-# Registro de produto em massa
+# Registro de productos en masa
 
-API NestJS para cadastrar e consultar produtos em massa. O contexto delimitado é o **Catálogo**: cadastro e consulta paginada de produtos.
+API NestJS para registrar y consultar productos en masa. El bounded context es el **Catálogo**: alta y consulta paginada de productos.
 
-Regra principal: **se qualquer item da massa falhar na validação ou na persistência, nenhum produto é salvo** (tudo ou nada). O item inválido é apontado na resposta.
+Regla principal: **si cualquier ítem de la masa falla en la validación o en la persistencia, no se guarda ningún producto** (todo o nada). El ítem inválido se indica en la respuesta.
 
-## Tecnologias
+## Tecnologías
 
 - NestJS
 - Sequelize
 - PostgreSQL
 
-## Como rodar
+## Cómo ejecutar
 
 ```bash
 cp .env.example .env
@@ -19,7 +19,7 @@ npm install
 npm run start:dev
 ```
 
-Variáveis de ambiente (sem credenciais no código): `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`.
+Variables de entorno (sin credenciales en el código): `PORT`, `DB_HOST`, `DB_PORT`, `DB_USERNAME`, `DB_PASSWORD`, `DB_NAME`.
 
 ```bash
 npm test    # unitários de domínio e casos de uso (sem banco)
@@ -28,7 +28,7 @@ npm run build
 
 ## API
 
-`POST /produtos` — multipart, campo `file` com um JSON array:
+`POST /produtos` — multipart, campo `file` con un JSON array:
 
 ```json
 [
@@ -46,34 +46,40 @@ npm run build
 ]
 ```
 
-Validação de domínio responde **422** com o índice do item. JSON malformado ou arquivo ausente responde **400**. Sucesso: `{ "message": "Produtos cadastrados com sucesso" }`.
+La validación de dominio responde **422** con el índice del ítem. Un JSON malformado o un archivo ausente responde **400**. Éxito: `{ "message": "Produtos cadastrados com sucesso" }`.
 
-`GET /produtos?page=1&limit=10` — paginação 1-based. `offset = (page - 1) * limit`. `limit` entre 1 e 100.
+`GET /produtos?page=1&limit=10` — paginación 1-based. `offset = (page - 1) * limit`. `limit` entre 1 y 100.
 
 `GET /` — healthcheck.
 
-## Arquitetura
+## Arquitectura
 
-Camadas do **Catálogo**, de dentro para fora:
+![Arquitectura Hexagonal](image.png)
+
+Capas del **Catálogo**, de adentro hacia afuera:
 
 ```
 domínio  →  aplicação (ports + use cases)  →  infraestrutura (adapters)
 ```
 
-A infraestrutura depende do domínio. O domínio não conhece NestJS, Sequelize nem HTTP.
+La infraestructura depende del dominio. El dominio no conoce NestJS, Sequelize ni HTTP.
 
-| Camada | O que entra | O que não entra |
+![Arquitectura hexagonal del Catálogo](docs/arquitectura-hexagonal.svg)
+
+*Diagrama del diseño actual: el dominio queda en el centro y las dependencias apuntan hacia adentro. La infraestructura implementa los puertos; el dominio no conoce NestJS ni Sequelize.*
+
+| Capa | Qué entra | Qué no entra |
 | --- | --- | --- |
-| **Domínio** | Agregado `Produto`, VOs, invariantes, `ErroDeValidacao` | NestJS, Sequelize, status HTTP |
-| **Aplicação** | Casos de uso e ports (`ProdutoRepository`, `UnitOfWork`) | Tipo `Transaction` do Sequelize, `HttpException` |
-| **Infraestrutura** | Controller HTTP, filter, repositório Sequelize, UoW, logger | Regra de negócio |
+| **Dominio** | Agregado `Produto`, VOs, invariantes, `ErroDeValidacao` | NestJS, Sequelize, status HTTP |
+| **Aplicación** | Casos de uso y ports (`ProdutoRepository`, `UnitOfWork`) | Tipo `Transaction` de Sequelize, `HttpException` |
+| **Infraestructura** | Controller HTTP, filter, repositorio Sequelize, UoW, logger | Regla de negocio |
 
-**Ports e adapters:** os casos de uso recebem interfaces. O `AppModule` injeta as implementações Sequelize. Os testes unitários usam fakes em memória no lugar desses adapters.
+**Ports y adapters:** los casos de uso reciben interfaces. El `AppModule` inyecta las implementaciones Sequelize. Los tests unitarios usan fakes en memoria en lugar de esos adapters.
 
-**Agregado `Produto`:** cria-se só se as invariantes passarem (código positivo, estoque ≥ 0, SKU, desconto 0–100, período válido). Comportamento: `estaVigente()`, `temEstoque()`.
+**Agregado `Produto`:** se crea solo si pasan las invariantes (código positivo, stock ≥ 0, SKU, descuento 0–100, período válido). Comportamiento: `estaVigente()`, `temEstoque()`.
 
-**Value objects:** `Sku` (normaliza e valida formato), `Desconto` (0–100) e `PeriodoVigencia` (`data_inicio`/`data_fim`, fim ≥ início).
+**Value objects:** `Sku` (normaliza y valida el formato), `Desconto` (0–100) y `PeriodoVigencia` (`data_inicio`/`data_fim`, fin ≥ inicio).
 
-**Tudo ou nada:** o caso de uso valida a massa inteira *antes* de tocar no banco (e rejeita SKU duplicado). Só então `UnitOfWork.execute` abre uma transação, persiste os lotes (10.000 itens) e o Sequelize faz commit. Qualquer exceção dispara rollback — o repositório **não** engole erro de `bulkCreate`.
+**Todo o nada:** el caso de uso valida la masa entera *antes* de tocar la base (y rechaza SKU duplicado). Recién ahí `UnitOfWork.execute` abre una transacción, persiste los lotes (10.000 ítems) y Sequelize hace commit. Cualquier excepción dispara rollback: el repositorio **no** traga el error de `bulkCreate`.
 
-Logs de requisição e de erro ficam no adapter HTTP (`logs/`).
+Los logs de request y de error quedan en el adapter HTTP (`logs/`).
